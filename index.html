@@ -31,6 +31,9 @@
       position: absolute;
       top: 10px;
       right: 10px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
       width: 280px;
       background: rgba(255, 255, 255, 0.95);
       border-radius: 10px;
@@ -41,20 +44,22 @@
       overflow-y: auto;
     }
 
-    #reiniciar-btn {
+    #reiniciar-btn, #centrar-btn {
       padding: 8px 12px;
-      background: #d9534f;
+      background: #0275d8;
       color: white;
       border: none;
       border-radius: 5px;
       cursor: pointer;
-      margin-bottom: 10px;
       width: 100%;
+    }
+
+    #reiniciar-btn {
+      background: #d9534f;
     }
 
     #info {
       font-weight: bold;
-      margin-bottom: 10px;
       font-size: 14px;
     }
 
@@ -75,20 +80,20 @@
 <div id="map"></div>
 
 <div id="panel">
-  <button id="reiniciar-btn" onclick="reiniciarRuta()">Reiniciar ruta</button>
   <div id="info">Haz clic en el mapa para agregar un destino.</div>
+  <button id="centrar-btn" onclick="centrarEnMiUbicacion()">📍 Centrar en mi ubicación</button>
+  <button id="reiniciar-btn" onclick="reiniciarRuta()">Reiniciar ruta</button>
   <ul id="listaDestinos"></ul>
 </div>
 
 <script>
-  const apiKey = "5b3ce3597851110001cf624841023b35821447ab8cb9659caa17eb9d"; // Reemplaza con tu clave
+  const apiKey = "5b3ce3597851110001cf624841023b35821447ab8cb9659caa17eb9d"; // Tu clave de OpenRouteService
 
   const map = L.map('map').setView([-13.53195, -71.96746], 14);
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
     maxZoom: 19
   }).addTo(map);
 
-  // 🔍 Buscador
   const provider = new GeoSearch.OpenStreetMapProvider();
   const searchControl = new GeoSearch.GeoSearchControl({
     provider,
@@ -104,9 +109,9 @@
   let marcadores = [];
   let rutaActual = null;
 
-  // ✅ UBICACIÓN EN VIVO
   let ubicacionActual = null;
   let marcadorUbicacion = null;
+  let mapaCentrado = false;
 
   function mostrarUbicacionEnVivo() {
     if (!navigator.geolocation) {
@@ -122,7 +127,6 @@
         if (marcadorUbicacion) {
           marcadorUbicacion.setLatLng([lat, lng]);
         } else {
-          // Agregar punto palpitante
           const pulsante = L.divIcon({
             className: 'punto-palpitante',
             iconSize: [20, 20]
@@ -131,8 +135,11 @@
           marcadorUbicacion = L.marker([lat, lng], { icon: pulsante }).addTo(map);
         }
 
-        map.setView([lat, lng]); // Centra el mapa
-
+        ubicacionActual = [lat, lng];
+        if (!mapaCentrado) {
+          map.setView([lat, lng], 16);
+          mapaCentrado = true;
+        }
       },
       (err) => {
         console.error("Error de geolocalización:", err);
@@ -145,9 +152,16 @@
     );
   }
 
-  mostrarUbicacionEnVivo(); // Llamamos al cargar
+  function centrarEnMiUbicacion() {
+    if (marcadorUbicacion) {
+      map.setView(marcadorUbicacion.getLatLng(), 16);
+    } else {
+      alert("Ubicación aún no detectada.");
+    }
+  }
 
-  // 📍 PUNTO ROJO PALPITANTE (CSS)
+  mostrarUbicacionEnVivo();
+
   const style = document.createElement("style");
   style.innerHTML = `
     .punto-palpitante {
@@ -166,7 +180,6 @@
   `;
   document.head.appendChild(style);
 
-  // --- TODO LO DEMÁS SIGUE IGUAL ---
   map.on('click', async function(e) {
     const nombre = prompt("¿Cómo se llama este lugar?");
     if (!nombre) return;
@@ -278,3 +291,6 @@
     actualizarLista([]);
   }
 </script>
+
+</body>
+</html>

@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Ruta Optimizada con Lista</title>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+  <!-- Leaflet -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+  <!-- Leaflet GeoSearch -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet-geosearch@3.11.0/dist/geosearch.css" />
+  <script src="https://unpkg.com/leaflet-geosearch@3.11.0/dist/bundle.min.js"></script>
+
+  <style>
+    body, html {
+      margin: 0;
+      padding: 0;
+      height: 100%;
+      font-family: sans-serif;
+    }
+
+    #map {
+      height: 100vh;
+      width: 100vw;
+      position: relative;
+    }
+
+    #panel {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      width: 280px;
+      background: rgba(255, 255, 255, 0.95);
+      border-radius: 10px;
+      padding: 12px;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+      z-index: 999;
+      max-height: 90vh;
+      overflow-y: auto;
+    }
+
+    #reiniciar-btn {
+      padding: 8px 12px;
+      background: #d9534f;
+      color: white;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+      margin-bottom: 10px;
+      width: 100%;
+    }
+
+    #info {
+      font-weight: bold;
+      margin-bottom: 10px;
+      font-size: 14px;
+    }
+
+    ul#listaDestinos {
+      list-style: none;
+      padding-left: 0;
+      font-size: 14px;
+    }
+
+    ul#listaDestinos li {
+      padding: 5px 0;
+      border-bottom: 1px solid #ccc;
+    }
+  </style>
+</head>
+<body>
+
+<div id="map"></div>
+
+<div id="panel">
+  <button id="reiniciar-btn" onclick="reiniciarRuta()">Reiniciar ruta</button>
+  <div id="info">Haz clic en el mapa para agregar un destino.</div>
+  <ul id="listaDestinos"></ul>
+</div>
+
+<script>
+  const apiKey = "5b3ce3597851110001cf624841023b35821447ab8cb9659caa17eb9d"; // Reemplaza con tu clave
+
+  const map = L.map('map').setView([-13.53195, -71.96746], 14);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    maxZoom: 19
+  }).addTo(map);
+
+  // 🔍 Buscador
+  const provider = new GeoSearch.OpenStreetMapProvider();
+  const searchControl = new GeoSearch.GeoSearchControl({
+    provider,
+    style: 'bar',
+    searchLabel: 'Buscar lugares...',
+    autoComplete: true,
+    autoClose: true,
+    keepResult: true
+  });
+  map.addControl(searchControl);
+
+  let destinos = [];
+  let marcadores = [];
+  let rutaActual = null;
+
+  // ✅ UBICACIÓN EN VIVO
+  let ubicacionActual = null;
+  let marcadorUbicacion = null;
+
+  function mostrarUbicacionEnVivo() {
+    if (!navigator.geolocation) {
+      alert("Tu navegador no permite ubicación en vivo.");
+      return;
+    }
+
+    navigator.geolocation.watchPosition(
+      (position) => {
+        const lat = position.coords.latitude;
+        const lng = position.coords.longitude;
+
+        if (marcadorUbicacion) {
+          marcadorUbicacion.setLatLng([lat, lng]);
+        } else {
+          // Agregar punto palpitante
+          const pulsante = L.divIcon({
+            className: 'punto-palpitante',
+            iconSize: [20, 20]
+          });
+
+          marcadorUbicacion = L.marker([lat, lng], { icon: pulsante }).addTo(map);
+        }
+
+        map.setView([lat, lng]); // Centra el mapa
+
+      },
+      (err) => {
+        console.error("Error de geolocalización:", err);
+        alert("No se pudo obtener tu ubicación.");
+      },
+      {
+        enableHighAccuracy: true,
+        maximumAge: 1000
+      }
+    );
+  }
+
+  mostrarUbicacionEnVivo(); // Llamamos al cargar
+
+  // 📍 PUNTO ROJO PALPITANTE (CSS)
+  const style = document.createElement("style");
+  style.innerHTML = `
+    .punto-palpitante {
+      width: 20px;
+      height: 20px;
+      background: red;
+      border-radius: 50%;
+      box-shadow: 0 0 15px rgba(255,0,0,0.7);
+      animation: latido 1.2s infinite;
+    }
+    @keyframes latido {
+      0% { transform: scale(1); opacity: 1; }
+      50% { transform: scale(1.3); opacity: 0.6; }
+      100% { transform: scale(1); opacity: 1; }
+    }
+  `;
+  document.head.appendChild(style);
+
+  // --- TODO LO DEMÁS SIGUE IGUAL ---
+  map.on('click', async function(e) {
+    const nombre = prompt("¿Cómo se llama este lugar?");
+    if (!nombre) return;
+
+    const latlng = e.latlng;
+    const destino = { nombre, location: [latlng.lng, latlng.lat] };
+    destinos.push(destino);
+
+    const marcador = L.marker(latlng).addTo(map)
+      .bindPopup(nombre)
+      .openPopup();
+    marcadores.push(marcador);
+
+    actualizarLista(destinos.map(d => d.nombre));
+
+    if (destinos.length >= 3) {
+      document.getElementById("info").innerText = "Calculando ruta optimizada...";
+
+      try {
+        const body = {
+          jobs: destinos.map((dest, i) => ({
+            id: i + 1,
+            location: dest.location
+          })),
+          vehicles: [{
+            id: 1,
+            profile: "foot-walking",
+            start: destinos[0].location
+          }]
+        };
+
+        const optResponse = await fetch("https://api.openrouteservice.org/optimization", {
+          method: "POST",
+          headers: {
+            "Authorization": apiKey,
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify(body)
+        });
+
+        const optData = await optResponse.json();
+
+        if (!optData.routes || !optData.routes[0]) {
+          document.getElementById("info").innerText = "❌ No se pudo calcular la ruta.";
+          console.error(optData);
+          return;
+        }
+
+        const ordenOptimizado = [
+          destinos[0].location,
+          ...optData.routes[0].steps
+            .filter(step => step.type === "job")
+            .map(step => destinos[step.job - 1].location)
+        ];
+
+        const nombresOrdenados = [
+          destinos[0].nombre,
+          ...optData.routes[0].steps
+            .filter(step => step.type === "job")
+            .map(step => destinos[step.job - 1].nombre)
+        ];
+        actualizarLista(nombresOrdenados);
+
+        const rutaResponse = await fetch("https://api.openrouteservice.org/v2/directions/foot-walking/geojson", {
+          method: "POST",
+          headers: {
+            "Authorization": apiKey,
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({ coordinates: ordenOptimizado })
+        });
+
+        const geojson = await rutaResponse.json();
+
+        if (rutaActual) map.removeLayer(rutaActual);
+        rutaActual = L.geoJSON(geojson, {
+          style: { color: 'green', weight: 5 }
+        }).addTo(map);
+
+        const distanciaKm = geojson.features[0].properties.summary.distance / 1000;
+        const duracionMin = geojson.features[0].properties.summary.duration / 60;
+        document.getElementById("info").innerText =
+          `✅ Ruta optimizada: ${distanciaKm.toFixed(2)} km en ${duracionMin.toFixed(0)} min`;
+
+      } catch (error) {
+        console.error("Error:", error);
+        document.getElementById("info").innerText = "❌ Error al calcular la ruta.";
+      }
+    }
+  });
+
+  function actualizarLista(lista) {
+    const ul = document.getElementById("listaDestinos");
+    ul.innerHTML = "";
+    lista.forEach((nombre, i) => {
+      const li = document.createElement("li");
+      li.textContent = `${i + 1}. ${nombre}`;
+      ul.appendChild(li);
+    });
+  }
+
+  function reiniciarRuta() {
+    destinos = [];
+    marcadores.forEach(m => map.removeLayer(m));
+    marcadores = [];
+    if (rutaActual) map.removeLayer(rutaActual);
+    rutaActual = null;
+    document.getElementById("info").innerText = "Haz clic en el mapa para agregar un destino.";
+    actualizarLista([]);
+  }
+</script>

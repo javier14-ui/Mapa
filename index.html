@@ -72,21 +72,6 @@
       border-bottom: 1px solid #ccc;
     }
 
-    .punto-palpitante {
-      width: 20px;
-      height: 20px;
-      background: red;
-      border-radius: 50%;
-      box-shadow: 0 0 15px rgba(255,0,0,0.7);
-      animation: latido 1.2s infinite;
-    }
-
-    @keyframes latido {
-      0% { transform: scale(1); opacity: 1; }
-      50% { transform: scale(1.3); opacity: 0.6; }
-      100% { transform: scale(1); opacity: 1; }
-    }
-
     #ubicacion-coords {
       font-size: 12px;
       margin-top: 5px;
@@ -108,7 +93,7 @@
 </div>
 
 <script>
-  const apiKey = "5b3ce3597851110001cf624841023b35821447ab8cb9659caa17eb9d"; // tu API key gratuita de openrouteservice
+  const apiKey = "5b3ce3597851110001cf624841023b35821447ab8cb9659caa17eb9d"; // tu API key
 
   const map = L.map('map').setView([-13.53195, -71.96746], 14);
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
@@ -131,7 +116,7 @@
   let marcadores = [];
   let rutaActual = null;
   let marcadorUbicacion = null;
-  let seguirUbicacion = false;
+  let seguirUbicacion = true;
   let mapaCentrado = false;
 
   function alternarSeguimiento() {
@@ -157,20 +142,25 @@
       (position) => {
         const lat = position.coords.latitude;
         const lng = position.coords.longitude;
+
         document.getElementById("ubicacion-coords").innerText = `📍 Lat: ${lat.toFixed(5)} / Lng: ${lng.toFixed(5)}`;
 
+        const nuevaPosicion = [lat, lng];
+
         if (!marcadorUbicacion) {
-          const pulsante = L.divIcon({
-            className: 'punto-palpitante',
-            iconSize: [20, 20]
-          });
-          marcadorUbicacion = L.marker([lat, lng], { icon: pulsante }).addTo(map);
+          marcadorUbicacion = L.marker(nuevaPosicion, {
+            icon: L.icon({
+              iconUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png",
+              iconSize: [25, 41],
+              iconAnchor: [12, 41]
+            })
+          }).addTo(map);
         } else {
-          marcadorUbicacion.setLatLng([lat, lng]);
+          marcadorUbicacion.setLatLng(nuevaPosicion);
         }
 
         if (seguirUbicacion || !mapaCentrado) {
-          map.setView([lat, lng], 16);
+          map.setView(nuevaPosicion, 16);
           mapaCentrado = true;
         }
       },

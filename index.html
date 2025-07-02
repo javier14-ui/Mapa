@@ -2,7 +2,7 @@
 <html>
 <head>
   <meta charset="utf-8" />
-  <title>Ruta Optimizada y Rotación</title>
+  <title>Ruta Optimizada con Rotación Plana</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
   <!-- MapLibre GL -->
@@ -14,23 +14,27 @@
       margin: 0;
       padding: 0;
       height: 100%;
+      font-family: sans-serif;
     }
+
     #map {
       position: absolute;
-      top: 0; bottom: 0; width: 100%;
+      top: 0; bottom: 0; left: 0; right: 0;
     }
+
     #panel {
       position: absolute;
       top: 10px;
       left: 10px;
       background: white;
-      padding: 10px;
+      padding: 12px;
       border-radius: 8px;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.4);
       z-index: 999;
       width: 260px;
-      box-shadow: 0 2px 6px rgba(0,0,0,0.3);
       font-size: 14px;
     }
+
     #panel button {
       width: 100%;
       padding: 8px;
@@ -41,24 +45,27 @@
       color: white;
       cursor: pointer;
     }
-    ul#lista {
+
+    #lista {
       list-style: none;
       padding-left: 0;
-      max-height: 200px;
+      max-height: 160px;
       overflow-y: auto;
     }
-    ul#lista li {
-      margin-bottom: 5px;
+
+    #lista li {
+      margin-bottom: 4px;
     }
   </style>
 </head>
 <body>
 
 <div id="map"></div>
+
 <div id="panel">
   <button onclick="centrarUbicacion()">📍 Centrar ubicación</button>
   <button onclick="reiniciar()">🔄 Reiniciar ruta</button>
-  <div><strong>Destinos:</strong></div>
+  <strong>Destinos:</strong>
   <ul id="lista"></ul>
 </div>
 
@@ -68,19 +75,17 @@
   const map = new maplibregl.Map({
     container: 'map',
     style: 'https://demotiles.maplibre.org/style.json',
-    center: [-71.96746, -13.53195],
+    center: [-71.96746, -13.53195], // Cusco
     zoom: 14,
-    pitch: 45,
-    bearing: 0,
-    attributionControl: false
+    bearing: 0 // Solo rotación plana, sin pitch
   });
 
   map.addControl(new maplibregl.NavigationControl({ showCompass: true }), 'top-right');
 
   let ubicacionActual = null;
   let marcadorUbicacion = null;
-  let marcadores = [];
   let destinos = [];
+  let marcadores = [];
   let rutaLayer = null;
 
   navigator.geolocation.watchPosition(pos => {
@@ -101,13 +106,13 @@
 
   function centrarUbicacion() {
     if (ubicacionActual) map.flyTo({ center: ubicacionActual, zoom: 16 });
-    else alert("Ubicación aún no detectada");
+    else alert("Tu ubicación aún no se ha detectado.");
   }
 
-  function actualizarLista(lista) {
+  function actualizarLista(nombres) {
     const ul = document.getElementById('lista');
     ul.innerHTML = '';
-    lista.forEach((nombre, i) => {
+    nombres.forEach((nombre, i) => {
       const li = document.createElement('li');
       li.textContent = `${i + 1}. ${nombre}`;
       ul.appendChild(li);
@@ -155,7 +160,7 @@
     const steps = data.routes[0].steps;
     const ordenado = [destinos[0], ...steps.filter(s => s.type === 'job').map(s => destinos[s.job - 1])];
 
-    const coordenadas = ordenado.map(d => d.coords);
+    const coordsOrdenados = ordenado.map(d => d.coords);
     const nombres = ordenado.map(d => d.nombre);
     actualizarLista(nombres);
 
@@ -165,7 +170,7 @@
         "Authorization": ORS_API_KEY,
         "Content-Type": "application/json"
       },
-      body: JSON.stringify({ coordinates: coordenadas })
+      body: JSON.stringify({ coordinates: coordsOrdenados })
     });
 
     const geojson = await geoResp.json();

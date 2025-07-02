@@ -74,10 +74,10 @@
 
   const map = new maplibregl.Map({
     container: 'map',
-    style: 'https://demotiles.maplibre.org/style.json',
+    style: 'https://api.maptiler.com/maps/streets/style.json?key=3nTo2KRbaG1jZPDCtQuM',
     center: [-71.96746, -13.53195], // Cusco
     zoom: 14,
-    bearing: 0 // Solo rotación plana, sin pitch
+    bearing: 0 // Rotación plana
   });
 
   map.addControl(new maplibregl.NavigationControl({ showCompass: true }), 'top-right');

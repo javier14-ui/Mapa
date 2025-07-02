@@ -2,7 +2,7 @@
 <html>
 <head>
   <meta charset="utf-8" />
-  <title>Ruta Optimizada con Rotación Plana</title>
+  <title>Ruta Optimizada - Cusco</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
   <!-- MapLibre GL -->
@@ -70,14 +70,15 @@
 </div>
 
 <script>
-  const ORS_API_KEY = "5b3ce3597851110001cf624841023b35821447ab8cb9659caa17eb9d";
+  const ORS_API_KEY = "5b3ce3597851110001cf624841023b35821447ab8cb9659caa17eb9d"; // OpenRouteService
+  const MAPTILER_KEY = "RQGeAMTsLUsv56L5Mvf5"; // ✅ Tu clave personal
 
   const map = new maplibregl.Map({
     container: 'map',
-    style: 'https://api.maptiler.com/maps/streets/style.json?key=3nTo2KRbaG1jZPDCtQuM',
+    style: `https://api.maptiler.com/maps/streets/style.json?key=${MAPTILER_KEY}`,
     center: [-71.96746, -13.53195], // Cusco
     zoom: 14,
-    bearing: 0 // Rotación plana
+    bearing: 0 // rotación inicial
   });
 
   map.addControl(new maplibregl.NavigationControl({ showCompass: true }), 'top-right');

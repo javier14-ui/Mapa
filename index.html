@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Ruta Optimizada con Lista</title>
+  <title>Ruta Optimizada con Seguimiento</title>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
@@ -24,16 +24,12 @@
     #map {
       height: 100vh;
       width: 100vw;
-      position: relative;
     }
 
     #panel {
       position: absolute;
       top: 10px;
       right: 10px;
-      display: flex;
-      flex-direction: column;
-      gap: 10px;
       width: 280px;
       background: rgba(255, 255, 255, 0.95);
       border-radius: 10px;
@@ -44,13 +40,14 @@
       overflow-y: auto;
     }
 
-    #reiniciar-btn, #centrar-btn {
+    button {
       padding: 8px 12px;
-      background: #0275d8;
+      background: #007bff;
       color: white;
       border: none;
       border-radius: 5px;
       cursor: pointer;
+      margin-bottom: 8px;
       width: 100%;
     }
 
@@ -60,6 +57,7 @@
 
     #info {
       font-weight: bold;
+      margin-bottom: 8px;
       font-size: 14px;
     }
 
@@ -73,6 +71,27 @@
       padding: 5px 0;
       border-bottom: 1px solid #ccc;
     }
+
+    .punto-palpitante {
+      width: 20px;
+      height: 20px;
+      background: red;
+      border-radius: 50%;
+      box-shadow: 0 0 15px rgba(255,0,0,0.7);
+      animation: latido 1.2s infinite;
+    }
+
+    @keyframes latido {
+      0% { transform: scale(1); opacity: 1; }
+      50% { transform: scale(1.3); opacity: 0.6; }
+      100% { transform: scale(1); opacity: 1; }
+    }
+
+    #ubicacion-coords {
+      font-size: 12px;
+      margin-top: 5px;
+      color: gray;
+    }
   </style>
 </head>
 <body>
@@ -80,20 +99,23 @@
 <div id="map"></div>
 
 <div id="panel">
+  <button id="reiniciar-btn" onclick="reiniciarRuta()">🔄 Reiniciar ruta</button>
+  <button onclick="centrarEnMiUbicacion()">📍 Centrar en mi ubicación</button>
+  <button onclick="alternarSeguimiento()">🧭 Activar seguimiento</button>
   <div id="info">Haz clic en el mapa para agregar un destino.</div>
-  <button id="centrar-btn" onclick="centrarEnMiUbicacion()">📍 Centrar en mi ubicación</button>
-  <button id="reiniciar-btn" onclick="reiniciarRuta()">Reiniciar ruta</button>
   <ul id="listaDestinos"></ul>
+  <div id="ubicacion-coords">📡 Esperando ubicación...</div>
 </div>
 
 <script>
-  const apiKey = "5b3ce3597851110001cf624841023b35821447ab8cb9659caa17eb9d"; // Tu clave de OpenRouteService
+  const apiKey = "5b3ce3597851110001cf624841023b35821447ab8cb9659caa17eb9d"; // tu API key gratuita de openrouteservice
 
   const map = L.map('map').setView([-13.53195, -71.96746], 14);
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
     maxZoom: 19
   }).addTo(map);
 
+  // Buscador
   const provider = new GeoSearch.OpenStreetMapProvider();
   const searchControl = new GeoSearch.GeoSearchControl({
     provider,
@@ -108,10 +130,22 @@
   let destinos = [];
   let marcadores = [];
   let rutaActual = null;
-
-  let ubicacionActual = null;
   let marcadorUbicacion = null;
+  let seguirUbicacion = false;
   let mapaCentrado = false;
+
+  function alternarSeguimiento() {
+    seguirUbicacion = !seguirUbicacion;
+    alert(seguirUbicacion ? "🧭 Seguimiento activado" : "🧭 Seguimiento desactivado");
+  }
+
+  function centrarEnMiUbicacion() {
+    if (marcadorUbicacion) {
+      map.setView(marcadorUbicacion.getLatLng(), 16);
+    } else {
+      alert("Ubicación aún no detectada.");
+    }
+  }
 
   function mostrarUbicacionEnVivo() {
     if (!navigator.geolocation) {
@@ -123,20 +157,19 @@
       (position) => {
         const lat = position.coords.latitude;
         const lng = position.coords.longitude;
+        document.getElementById("ubicacion-coords").innerText = `📍 Lat: ${lat.toFixed(5)} / Lng: ${lng.toFixed(5)}`;
 
-        if (marcadorUbicacion) {
-          marcadorUbicacion.setLatLng([lat, lng]);
-        } else {
+        if (!marcadorUbicacion) {
           const pulsante = L.divIcon({
             className: 'punto-palpitante',
             iconSize: [20, 20]
           });
-
           marcadorUbicacion = L.marker([lat, lng], { icon: pulsante }).addTo(map);
+        } else {
+          marcadorUbicacion.setLatLng([lat, lng]);
         }
 
-        ubicacionActual = [lat, lng];
-        if (!mapaCentrado) {
+        if (seguirUbicacion || !mapaCentrado) {
           map.setView([lat, lng], 16);
           mapaCentrado = true;
         }
@@ -152,33 +185,7 @@
     );
   }
 
-  function centrarEnMiUbicacion() {
-    if (marcadorUbicacion) {
-      map.setView(marcadorUbicacion.getLatLng(), 16);
-    } else {
-      alert("Ubicación aún no detectada.");
-    }
-  }
-
   mostrarUbicacionEnVivo();
-
-  const style = document.createElement("style");
-  style.innerHTML = `
-    .punto-palpitante {
-      width: 20px;
-      height: 20px;
-      background: red;
-      border-radius: 50%;
-      box-shadow: 0 0 15px rgba(255,0,0,0.7);
-      animation: latido 1.2s infinite;
-    }
-    @keyframes latido {
-      0% { transform: scale(1); opacity: 1; }
-      50% { transform: scale(1.3); opacity: 0.6; }
-      100% { transform: scale(1); opacity: 1; }
-    }
-  `;
-  document.head.appendChild(style);
 
   map.on('click', async function(e) {
     const nombre = prompt("¿Cómo se llama este lugar?");
@@ -188,11 +195,8 @@
     const destino = { nombre, location: [latlng.lng, latlng.lat] };
     destinos.push(destino);
 
-    const marcador = L.marker(latlng).addTo(map)
-      .bindPopup(nombre)
-      .openPopup();
+    const marcador = L.marker(latlng).addTo(map).bindPopup(nombre).openPopup();
     marcadores.push(marcador);
-
     actualizarLista(destinos.map(d => d.nombre));
 
     if (destinos.length >= 3) {
@@ -224,7 +228,6 @@
 
         if (!optData.routes || !optData.routes[0]) {
           document.getElementById("info").innerText = "❌ No se pudo calcular la ruta.";
-          console.error(optData);
           return;
         }
 
@@ -241,6 +244,7 @@
             .filter(step => step.type === "job")
             .map(step => destinos[step.job - 1].nombre)
         ];
+
         actualizarLista(nombresOrdenados);
 
         const rutaResponse = await fetch("https://api.openrouteservice.org/v2/directions/foot-walking/geojson", {
@@ -291,6 +295,5 @@
     actualizarLista([]);
   }
 </script>
-
 </body>
 </html>

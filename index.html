@@ -28,8 +28,8 @@
 
     #panel {
       position: absolute;
-      top: 10px;
-      right: 10px;
+      top: 60px;
+      left: 10px;
       width: 280px;
       background: rgba(255, 255, 255, 0.95);
       border-radius: 10px;
@@ -159,7 +159,11 @@
           marcadorUbicacion.setLatLng(nuevaPosicion);
         }
 
-        if (seguirUbicacion || !mapaCentrado) {
+        if (seguirUbicacion && mapaCentrado) {
+          map.setView(nuevaPosicion);
+        }
+
+        if (!mapaCentrado) {
           map.setView(nuevaPosicion, 16);
           mapaCentrado = true;
         }
@@ -176,6 +180,11 @@
   }
 
   mostrarUbicacionEnVivo();
+
+  // 🛠️ Si el usuario mueve el mapa, desactivamos el seguimiento
+  map.on('dragstart', () => {
+    seguirUbicacion = false;
+  });
 
   map.on('click', async function(e) {
     const nombre = prompt("¿Cómo se llama este lugar?");

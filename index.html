@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Ruta Optimizada con Seguimiento</title>
+  <title>Guía de Viaje a Cusco</title>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
@@ -18,54 +18,51 @@
       margin: 0;
       padding: 0;
       height: 100%;
-      font-family: sans-serif;
     }
 
     #map {
       height: 100vh;
       width: 100vw;
-      touch-action: none; /* Permite rotar y hacer zoom con 2 dedos */
+      transition: transform 0.3s ease;
+      transform-origin: center center;
+      overflow: hidden;
     }
 
     #panel {
       position: absolute;
-      top: 60px;
+      top: 70px;
       left: 10px;
       width: 280px;
       background: rgba(255, 255, 255, 0.95);
+      padding: 10px;
       border-radius: 10px;
-      padding: 12px;
       box-shadow: 0 2px 6px rgba(0,0,0,0.3);
       z-index: 999;
-      max-height: 90vh;
-      overflow-y: auto;
     }
 
-    button {
-      padding: 8px 12px;
-      background: #007bff;
-      color: white;
+    #panel button {
+      margin-bottom: 8px;
+      width: 100%;
+      padding: 8px;
       border: none;
       border-radius: 5px;
       cursor: pointer;
-      margin-bottom: 8px;
-      width: 100%;
     }
 
-    #reiniciar-btn {
-      background: #d9534f;
-    }
+    #reiniciar-btn { background: #d9534f; color: white; }
+    #centrar-btn { background: #0275d8; color: white; }
+    #rotar-izq-btn, #rotar-der-btn { background: #5bc0de; color: white; }
 
     #info {
+      margin: 10px 0;
       font-weight: bold;
-      margin-bottom: 8px;
       font-size: 14px;
     }
 
     ul#listaDestinos {
       list-style: none;
       padding-left: 0;
-      font-size: 14px;
+      font-size: 13px;
     }
 
     ul#listaDestinos li {
@@ -73,14 +70,14 @@
       border-bottom: 1px solid #ccc;
     }
 
-    #ubicacion-coords {
-      font-size: 12px;
-      margin-top: 5px;
-      color: gray;
-    }
-
+    /* Búsqueda visible */
     .leaflet-control-geosearch {
       z-index: 1000 !important;
+    }
+
+    .leaflet-control-geosearch form {
+      position: relative !important;
+      z-index: 1001 !important;
     }
   </style>
 </head>
@@ -90,21 +87,23 @@
 
 <div id="panel">
   <button id="reiniciar-btn" onclick="reiniciarRuta()">🔄 Reiniciar ruta</button>
-  <button onclick="centrarEnMiUbicacion()">📍 Centrar en mi ubicación</button>
-  <button onclick="alternarSeguimiento()">🧭 Activar seguimiento</button>
-  <div id="info">Haz clic en el mapa para agregar un destino.</div>
+  <button id="centrar-btn" onclick="centrarEnMiUbicacion()">📍 Centrar ubicación</button>
+  <button id="rotar-izq-btn" onclick="rotarMapa(-15)">⤺ Rotar izquierda</button>
+  <button id="rotar-der-btn" onclick="rotarMapa(15)">⤻ Rotar derecha</button>
+  <div id="info">Haz clic en el mapa para agregar destinos.</div>
   <ul id="listaDestinos"></ul>
-  <div id="ubicacion-coords">📡 Esperando ubicación...</div>
 </div>
 
 <script>
   const apiKey = "5b3ce3597851110001cf624841023b35821447ab8cb9659caa17eb9d";
+  let currentRotation = 0;
 
   const map = L.map('map').setView([-13.53195, -71.96746], 14);
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
     maxZoom: 19
   }).addTo(map);
 
+  // Buscador
   const provider = new GeoSearch.OpenStreetMapProvider();
   const searchControl = new GeoSearch.GeoSearchControl({
     provider,
@@ -115,34 +114,16 @@
     keepResult: true
   });
   map.addControl(searchControl);
-
-  // Estilo de la barra de búsqueda
   document.querySelector('.leaflet-control-geosearch').style.marginTop = '10px';
-  document.querySelector('.leaflet-control-geosearch').style.marginLeft = '10px';
 
   let destinos = [];
   let marcadores = [];
   let rutaActual = null;
   let marcadorUbicacion = null;
-  let seguirUbicacion = true;
-  let mapaCentrado = false;
-
-  function alternarSeguimiento() {
-    seguirUbicacion = !seguirUbicacion;
-    alert(seguirUbicacion ? "🧭 Seguimiento activado" : "🧭 Seguimiento desactivado");
-  }
-
-  function centrarEnMiUbicacion() {
-    if (marcadorUbicacion) {
-      map.setView(marcadorUbicacion.getLatLng(), 16);
-    } else {
-      alert("Ubicación aún no detectada.");
-    }
-  }
 
   function mostrarUbicacionEnVivo() {
     if (!navigator.geolocation) {
-      alert("Tu navegador no permite ubicación en vivo.");
+      alert("Tu navegador no soporta geolocalización.");
       return;
     }
 
@@ -150,34 +131,17 @@
       (position) => {
         const lat = position.coords.latitude;
         const lng = position.coords.longitude;
-
-        document.getElementById("ubicacion-coords").innerText = `📍 Lat: ${lat.toFixed(5)} / Lng: ${lng.toFixed(5)}`;
-        const nuevaPosicion = [lat, lng];
+        const nuevaPos = [lat, lng];
 
         if (!marcadorUbicacion) {
-          marcadorUbicacion = L.marker(nuevaPosicion, {
-            icon: L.icon({
-              iconUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png",
-              iconSize: [25, 41],
-              iconAnchor: [12, 41]
-            })
-          }).addTo(map);
+          marcadorUbicacion = L.marker(nuevaPos).addTo(map);
         } else {
-          marcadorUbicacion.setLatLng(nuevaPosicion);
-        }
-
-        if (seguirUbicacion && mapaCentrado) {
-          map.setView(nuevaPosicion);
-        }
-
-        if (!mapaCentrado) {
-          map.setView(nuevaPosicion, 16);
-          mapaCentrado = true;
+          marcadorUbicacion.setLatLng(nuevaPos);
         }
       },
       (err) => {
-        console.error("Error de geolocalización:", err);
-        alert("No se pudo obtener tu ubicación.");
+        alert("No se pudo obtener la ubicación.");
+        console.error(err);
       },
       {
         enableHighAccuracy: true,
@@ -188,9 +152,13 @@
 
   mostrarUbicacionEnVivo();
 
-  map.on('dragstart', () => {
-    seguirUbicacion = false;
-  });
+  function centrarEnMiUbicacion() {
+    if (marcadorUbicacion) {
+      map.setView(marcadorUbicacion.getLatLng(), 16);
+    } else {
+      alert("Ubicación aún no detectada.");
+    }
+  }
 
   map.on('click', async function(e) {
     const nombre = prompt("¿Cómo se llama este lugar?");
@@ -200,8 +168,10 @@
     const destino = { nombre, location: [latlng.lng, latlng.lat] };
     destinos.push(destino);
 
-    const marcador = L.marker(latlng).addTo(map).bindPopup(nombre).openPopup();
+    const marcador = L.marker(latlng).addTo(map)
+      .bindPopup(nombre).openPopup();
     marcadores.push(marcador);
+
     actualizarLista(destinos.map(d => d.nombre));
 
     if (destinos.length >= 3) {
@@ -230,11 +200,6 @@
         });
 
         const optData = await optResponse.json();
-
-        if (!optData.routes || !optData.routes[0]) {
-          document.getElementById("info").innerText = "❌ No se pudo calcular la ruta.";
-          return;
-        }
 
         const ordenOptimizado = [
           destinos[0].location,
@@ -296,9 +261,18 @@
     marcadores = [];
     if (rutaActual) map.removeLayer(rutaActual);
     rutaActual = null;
-    document.getElementById("info").innerText = "Haz clic en el mapa para agregar un destino.";
+    document.getElementById("info").innerText = "Haz clic en el mapa para agregar destinos.";
     actualizarLista([]);
   }
+
+  function rotarMapa(grados) {
+    currentRotation = (currentRotation + grados) % 360;
+    const mapDiv = document.getElementById("map");
+    const pane = map.getPane("mapPane");
+    mapDiv.style.transform = `rotate(${currentRotation}deg)`;
+    pane.style.transform = `rotate(${-currentRotation}deg)`;
+  }
 </script>
+
 </body>
 </html>

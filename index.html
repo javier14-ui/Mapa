@@ -24,6 +24,7 @@
     #map {
       height: 100vh;
       width: 100vw;
+      touch-action: none; /* Permite rotar y hacer zoom con 2 dedos */
     }
 
     #panel {
@@ -77,6 +78,10 @@
       margin-top: 5px;
       color: gray;
     }
+
+    .leaflet-control-geosearch {
+      z-index: 1000 !important;
+    }
   </style>
 </head>
 <body>
@@ -93,14 +98,13 @@
 </div>
 
 <script>
-  const apiKey = "5b3ce3597851110001cf624841023b35821447ab8cb9659caa17eb9d"; // tu API key
+  const apiKey = "5b3ce3597851110001cf624841023b35821447ab8cb9659caa17eb9d";
 
   const map = L.map('map').setView([-13.53195, -71.96746], 14);
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
     maxZoom: 19
   }).addTo(map);
 
-  // Buscador
   const provider = new GeoSearch.OpenStreetMapProvider();
   const searchControl = new GeoSearch.GeoSearchControl({
     provider,
@@ -111,6 +115,10 @@
     keepResult: true
   });
   map.addControl(searchControl);
+
+  // Estilo de la barra de búsqueda
+  document.querySelector('.leaflet-control-geosearch').style.marginTop = '10px';
+  document.querySelector('.leaflet-control-geosearch').style.marginLeft = '10px';
 
   let destinos = [];
   let marcadores = [];
@@ -144,7 +152,6 @@
         const lng = position.coords.longitude;
 
         document.getElementById("ubicacion-coords").innerText = `📍 Lat: ${lat.toFixed(5)} / Lng: ${lng.toFixed(5)}`;
-
         const nuevaPosicion = [lat, lng];
 
         if (!marcadorUbicacion) {
@@ -181,7 +188,6 @@
 
   mostrarUbicacionEnVivo();
 
-  // 🛠️ Si el usuario mueve el mapa, desactivamos el seguimiento
   map.on('dragstart', () => {
     seguirUbicacion = false;
   });

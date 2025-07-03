@@ -2,12 +2,16 @@
 <html>
 <head>
   <meta charset="utf-8" />
-  <title>Ruta Optimizada - Cusco</title>
+  <title>Ruta Optimizada con Búsqueda</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-  <!-- MapLibre GL -->
-  <link href="https://unpkg.com/maplibre-gl@2.4.0/dist/maplibre-gl.css" rel="stylesheet" />
-  <script src="https://unpkg.com/maplibre-gl@2.4.0/dist/maplibre-gl.js"></script>
+  <!-- Leaflet -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+  <!-- Leaflet-Geosearch -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet-geosearch@3.11.0/dist/geosearch.css" />
+  <script src="https://unpkg.com/leaflet-geosearch@3.11.0/dist/bundle.min.js"></script>
 
   <style>
     html, body {
@@ -18,199 +22,182 @@
     }
 
     #map {
-      position: absolute;
-      top: 0; bottom: 0; left: 0; right: 0;
+      height: 100%;
+      width: 100%;
     }
 
     #panel {
       position: absolute;
       top: 10px;
-      left: 10px;
-      background: white;
-      padding: 12px;
+      right: 10px;
+      width: 250px;
+      background: rgba(255,255,255,0.95);
+      padding: 10px;
       border-radius: 8px;
-      box-shadow: 0 2px 6px rgba(0,0,0,0.4);
-      z-index: 999;
-      width: 260px;
-      font-size: 14px;
+      z-index: 1000;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.3);
     }
 
-    #panel button {
-      width: 100%;
-      padding: 8px;
-      margin-bottom: 6px;
-      border: none;
-      border-radius: 4px;
-      background-color: #007bff;
-      color: white;
-      cursor: pointer;
-    }
-
-    #lista {
-      list-style: none;
-      padding-left: 0;
-      max-height: 160px;
+    #listaDestinos {
+      max-height: 200px;
       overflow-y: auto;
+      margin: 10px 0;
+      padding: 0;
+      list-style: none;
     }
 
-    #lista li {
-      margin-bottom: 4px;
+    #listaDestinos li {
+      margin-bottom: 6px;
+    }
+
+    button {
+      width: 100%;
+      margin-bottom: 8px;
+      padding: 8px;
+      border: none;
+      background: #007bff;
+      color: white;
+      border-radius: 5px;
+      cursor: pointer;
     }
   </style>
 </head>
 <body>
-
 <div id="map"></div>
-
 <div id="panel">
   <button onclick="centrarUbicacion()">📍 Centrar ubicación</button>
-  <button onclick="reiniciar()">🔄 Reiniciar ruta</button>
-  <strong>Destinos:</strong>
-  <ul id="lista"></ul>
+  <button onclick="reiniciarRuta()">🔄 Reiniciar ruta</button>
+  <ul id="listaDestinos"></ul>
 </div>
 
 <script>
-  const ORS_API_KEY = "5b3ce3597851110001cf624841023b35821447ab8cb9659caa17eb9d"; // OpenRouteService
-  const MAPTILER_KEY = "RQGeAMTsLUsv56L5Mvf5"; // ✅ Tu clave personal
+  const ORS_KEY = "5b3ce3597851110001cf624841023b35821447ab8cb9659caa17eb9d";
+  const map = L.map('map').setView([-13.53195, -71.96746], 14);
 
-  const map = new maplibregl.Map({
-    container: 'map',
-    style: `https://api.maptiler.com/maps/streets/style.json?key=${MAPTILER_KEY}`,
-    center: [-71.96746, -13.53195], // Cusco
-    zoom: 14,
-    bearing: 0 // rotación inicial
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    maxZoom: 19
+  }).addTo(map);
+
+  const search = new GeoSearch.GeoSearchControl({
+    provider: new GeoSearch.OpenStreetMapProvider(),
+    style: 'bar',
+    searchLabel: 'Buscar lugar...',
+    autoComplete: true,
+    autoClose: true
   });
-
-  map.addControl(new maplibregl.NavigationControl({ showCompass: true }), 'top-right');
+  map.addControl(search);
 
   let ubicacionActual = null;
   let marcadorUbicacion = null;
+  navigator.geolocation.watchPosition(pos => {
+    const coords = [pos.coords.latitude, pos.coords.longitude];
+    ubicacionActual = coords;
+    if (!marcadorUbicacion) {
+      marcadorUbicacion = L.marker(coords, { icon: L.divIcon({ className: 'punto-palpitante' }) }).addTo(map);
+    } else {
+      marcadorUbicacion.setLatLng(coords);
+    }
+  });
+
+  const style = document.createElement('style');
+  style.innerHTML = `
+    .punto-palpitante {
+      width: 16px;
+      height: 16px;
+      background: red;
+      border-radius: 50%;
+      box-shadow: 0 0 12px red;
+      animation: pulse 1.5s infinite;
+    }
+    @keyframes pulse {
+      0% { transform: scale(1); opacity: 1; }
+      50% { transform: scale(1.3); opacity: 0.7; }
+      100% { transform: scale(1); opacity: 1; }
+    }
+  `;
+  document.head.appendChild(style);
+
+  function centrarUbicacion() {
+    if (ubicacionActual) map.setView(ubicacionActual, 16);
+  }
+
   let destinos = [];
   let marcadores = [];
   let rutaLayer = null;
 
-  navigator.geolocation.watchPosition(pos => {
-    const coords = [pos.coords.longitude, pos.coords.latitude];
-    ubicacionActual = coords;
-
-    if (!marcadorUbicacion) {
-      marcadorUbicacion = new maplibregl.Marker({ color: 'red' })
-        .setLngLat(coords)
-        .addTo(map);
-    } else {
-      marcadorUbicacion.setLngLat(coords);
-    }
-  }, err => console.error(err), {
-    enableHighAccuracy: true,
-    maximumAge: 1000
-  });
-
-  function centrarUbicacion() {
-    if (ubicacionActual) map.flyTo({ center: ubicacionActual, zoom: 16 });
-    else alert("Tu ubicación aún no se ha detectado.");
-  }
-
-  function actualizarLista(nombres) {
-    const ul = document.getElementById('lista');
+  function actualizarLista() {
+    const ul = document.getElementById('listaDestinos');
     ul.innerHTML = '';
-    nombres.forEach((nombre, i) => {
+    destinos.forEach((dest, i) => {
       const li = document.createElement('li');
-      li.textContent = `${i + 1}. ${nombre}`;
+      li.textContent = `${i + 1}. ${dest.nombre}`;
       ul.appendChild(li);
     });
   }
 
-  function reiniciar() {
-    destinos = [];
-    marcadores.forEach(m => m.remove());
-    marcadores = [];
-    if (rutaLayer) {
-      map.removeLayer('ruta');
-      map.removeSource('ruta');
-    }
-    actualizarLista([]);
-  }
-
-  async function optimizarRuta() {
+  async function calcularRuta() {
     if (destinos.length < 2) return;
 
-    const jobs = destinos.map((dest, i) => ({
-      id: i + 1,
-      location: dest.coords
-    }));
-
+    const jobs = destinos.map((dest, i) => ({ id: i + 1, location: [dest.lng, dest.lat] }));
     const body = {
       jobs,
-      vehicles: [{
-        id: 1,
-        profile: "foot-walking",
-        start: destinos[0].coords
-      }]
+      vehicles: [{ id: 1, profile: "foot-walking", start: [destinos[0].lng, destinos[0].lat] }]
     };
 
-    const response = await fetch("https://api.openrouteservice.org/optimization", {
-      method: "POST",
+    const optRes = await fetch("https://api.openrouteservice.org/optimization", {
+      method: 'POST',
       headers: {
-        "Authorization": ORS_API_KEY,
-        "Content-Type": "application/json"
+        'Authorization': ORS_KEY,
+        'Content-Type': 'application/json'
       },
       body: JSON.stringify(body)
     });
+    const optData = await optRes.json();
+    const orden = [jobs[0].location];
 
-    const data = await response.json();
-    const steps = data.routes[0].steps;
-    const ordenado = [destinos[0], ...steps.filter(s => s.type === 'job').map(s => destinos[s.job - 1])];
-
-    const coordsOrdenados = ordenado.map(d => d.coords);
-    const nombres = ordenado.map(d => d.nombre);
-    actualizarLista(nombres);
-
-    const geoResp = await fetch("https://api.openrouteservice.org/v2/directions/foot-walking/geojson", {
-      method: "POST",
-      headers: {
-        "Authorization": ORS_API_KEY,
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify({ coordinates: coordsOrdenados })
+    optData.routes[0].steps.forEach(step => {
+      if (step.type === "job") {
+        orden.push(jobs[step.job - 1].location);
+      }
     });
 
-    const geojson = await geoResp.json();
+    const rutaRes = await fetch("https://api.openrouteservice.org/v2/directions/foot-walking/geojson", {
+      method: 'POST',
+      headers: {
+        'Authorization': ORS_KEY,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ coordinates: orden })
+    });
+    const rutaJson = await rutaRes.json();
 
-    if (rutaLayer) {
-      map.getSource('ruta').setData(geojson);
-    } else {
-      map.addSource('ruta', {
-        type: 'geojson',
-        data: geojson
-      });
-      map.addLayer({
-        id: 'ruta',
-        type: 'line',
-        source: 'ruta',
-        paint: {
-          'line-color': '#28a745',
-          'line-width': 4
-        }
-      });
-    }
+    if (rutaLayer) rutaLayer.remove();
+    rutaLayer = L.geoJSON(rutaJson, {
+      style: { color: 'green', weight: 5 }
+    }).addTo(map);
+  }
+
+  function reiniciarRuta() {
+    destinos = [];
+    marcadores.forEach(m => map.removeLayer(m));
+    marcadores = [];
+    if (rutaLayer) map.removeLayer(rutaLayer);
+    rutaLayer = null;
+    actualizarLista();
   }
 
   map.on('click', async e => {
     const nombre = prompt("Nombre del destino:");
     if (!nombre) return;
 
-    const coords = [e.lngLat.lng, e.lngLat.lat];
-    destinos.push({ nombre, coords });
-
-    const marker = new maplibregl.Marker()
-      .setLngLat(coords)
-      .setPopup(new maplibregl.Popup().setText(nombre))
-      .addTo(map);
-
+    const { lat, lng } = e.latlng;
+    destinos.push({ nombre, lat, lng });
+    const marker = L.marker([lat, lng]).addTo(map).bindPopup(nombre);
     marcadores.push(marker);
-    await optimizarRuta();
+
+    actualizarLista();
+    if (destinos.length >= 2) await calcularRuta();
   });
 </script>
-
 </body>
 </html>

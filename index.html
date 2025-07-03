@@ -4,7 +4,17 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Optimizador de Rutas</title>
-    <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyCd_0t1m3ippIgRj9HDbVT1FErHUJUA0QA&libraries=places,geometry&callback=initMap"></script>
+    <script>
+        function loadMap() {
+            const script = document.createElement('script');
+            script.src = 'https://maps.googleapis.com/maps/api/js?key=AIzaSyCd_0t1m3ippIgRj9HDbVT1FErHUJUA0QA&libraries=places,geometry&callback=initMap';
+            script.onerror = () => {
+                alert('Error al cargar la API de Google Maps. Revisa tu conexión o la validez de la API key.');
+            };
+            document.head.appendChild(script);
+        }
+        loadMap();
+    </script>
     <style>
         * {
             box-sizing: border-box;
@@ -198,10 +208,16 @@
         let polyline;
 
         function initMap() {
-            map = new google.maps.Map(document.getElementById('map'), {
-                center: { lat: 19.4326, lng: -99.1332 }, // Centro en CDMX inicialmente
-                zoom: 12
-            });
+            try {
+                map = new google.maps.Map(document.getElementById('map'), {
+                    center: { lat: 19.4326, lng: -99.1332 }, // Centro en CDMX inicialmente
+                    zoom: 12
+                });
+            } catch (error) {
+                alert('Error al cargar Google Maps. Revisa la consola para detalles. Error: ' + error.message);
+                console.error('Google Maps Error:', error);
+                return;
+            }
 
             directionsService = new google.maps.DirectionsService();
             directionsRenderer = new google.maps.DirectionsRenderer({ 
@@ -515,3 +531,4 @@
     </script>
 </body>
 </html>
+

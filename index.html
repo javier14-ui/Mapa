@@ -31,17 +31,16 @@
         }
 
         #search-container {
-            position: absolute;
-            top: 10px;
-            left: 50%;
-            transform: translateX(-50%);
-            width: 80%;
-            max-width: 500px;
+            position: fixed;
+            top: 70px;
+            left: 10px;
+            right: 10px;
             z-index: 10;
             background: white;
             border-radius: 5px;
             box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
             padding: 5px;
+            width: calc(100% - 20px);
         }
 
         #search-input {
@@ -151,14 +150,21 @@
             #panel {
                 width: 100%;
                 height: auto;
-                max-height: 40%;
-                position: absolute;
+                max-height: 50%;
+                position: fixed;
                 bottom: 0;
-                transform: translateY(calc(100% - 60px));
+                left: 0;
+                right: 0;
+                transform: translateY(calc(100% - 100px));
+                z-index: 20;
             }
 
             .panel-toggle {
                 display: block;
+                width: 60px;
+                height: 60px;
+                right: -60px;
+                font-size: 24px;
             }
 
             #panel.show-panel {
@@ -210,8 +216,12 @@
         function initMap() {
             try {
                 map = new google.maps.Map(document.getElementById('map'), {
-                    center: { lat: 19.4326, lng: -99.1332 }, // Centro en CDMX inicialmente
-                    zoom: 12
+                    center: { lat: 19.4326, lng: -99.1332 },
+                    zoom: 12,
+                    gestureHandling: 'greedy',
+                    disableDoubleClickZoom: true,
+                    draggable: true,
+                    draggableCursor: 'pointer'
                 });
             } catch (error) {
                 alert('Error al cargar Google Maps. Revisa la consola para detalles. Error: ' + error.message);
@@ -531,4 +541,3 @@
     </script>
 </body>
 </html>
-

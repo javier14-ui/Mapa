@@ -25,15 +25,19 @@
       font-family: sans-serif;
     }
 
-    #reiniciar-btn {
+    #reiniciar-btn, #centrar-btn {
       padding: 8px 12px;
-      background: #d9534f;
+      background: #007bff;
       color: white;
       border: none;
       border-radius: 5px;
       cursor: pointer;
       width: 100%;
       margin-bottom: 10px;
+    }
+
+    #reiniciar-btn {
+      background: #d9534f;
     }
 
     #info {
@@ -59,7 +63,8 @@
 <div id="map"></div>
 
 <div id="panel">
-  <button id="reiniciar-btn" onclick="reiniciarRuta()">Reiniciar ruta</button>
+  <button id="reiniciar-btn" onclick="reiniciarRuta()">🔄 Reiniciar ruta</button>
+  <button id="centrar-btn" onclick="centrarUbicacion()">📍 Centrar ubicación</button>
   <div id="info">Haz clic en el mapa para agregar un destino.</div>
   <ul id="listaDestinos"></ul>
 </div>
@@ -75,7 +80,6 @@
     maxZoom: 19
   }).addTo(map);
 
-  // 🔍 Buscador
   const provider = new GeoSearch.OpenStreetMapProvider();
   const searchControl = new GeoSearch.GeoSearchControl({
     provider,
@@ -91,15 +95,17 @@
   let rutaActual = null;
   let marcadorUbicacion = null;
 
+  let ultimaUbicacion = null;
+
   // 🌍 Ubicación exacta del usuario
   if (navigator.geolocation) {
     navigator.geolocation.watchPosition(
       (pos) => {
-        const latlng = [pos.coords.latitude, pos.coords.longitude];
+        ultimaUbicacion = [pos.coords.latitude, pos.coords.longitude];
         if (!marcadorUbicacion) {
-          marcadorUbicacion = L.marker(latlng).addTo(map).bindPopup("Tu ubicación actual").openPopup();
+          marcadorUbicacion = L.marker(ultimaUbicacion).addTo(map).bindPopup("Tu ubicación actual").openPopup();
         } else {
-          marcadorUbicacion.setLatLng(latlng);
+          marcadorUbicacion.setLatLng(ultimaUbicacion);
         }
       },
       (err) => {
@@ -111,6 +117,14 @@
         maximumAge: 1000
       }
     );
+  }
+
+  function centrarUbicacion() {
+    if (ultimaUbicacion) {
+      map.setView(ultimaUbicacion, 16);
+    } else {
+      alert("La ubicación aún no está disponible.");
+    }
   }
 
   map.on('click', async function(e) {

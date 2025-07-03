@@ -1,84 +1,79 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Mapa de Viaje a Cusco</title>
+  <title>Ruta Real por Calles - Cusco</title>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-  <!-- Estilo de Leaflet -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <style>
     #map {
       height: 100vh;
+      width: 100vw;
+      margin: 0;
+      padding: 0;
     }
   </style>
 </head>
 <body>
   <div id="map"></div>
 
-  <!-- Script de Leaflet -->
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script>
-    // Crear el mapa centrado en Cusco inicialmente
-    var map = L.map('map').setView([-13.53195, -71.96746], 13);
+    const apiKey = "RQGeAMTsLUsv56L5Mvf5";
+    const map = L.map('map').setView([-13.53195, -71.96746], 13);
 
-    // Capa básica de OpenStreetMap
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
       maxZoom: 18
     }).addTo(map);
 
-    // Destinos y ruta
-    var destinos = [];
-    var ruta = null;
+    let destinos = [];
+    let rutaLayer = null;
 
-    // Al hacer clic, agregar marcador y dibujar línea
-    map.on('click', function(e) {
-      var latlng = e.latlng;
-      destinos.push(latlng);
+    map.on('click', async function(e) {
+      const latlng = e.latlng;
+      destinos.push([latlng.lng, latlng.lat]);
 
-      L.marker(latlng).addTo(map)
-        .bindPopup("Destino " + destinos.length)
-        .openPopup();
+      L.marker(latlng).addTo(map).bindPopup("Destino " + destinos.length).openPopup();
 
-      if (ruta) {
-        map.removeLayer(ruta);
+      if (destinos.length >= 2) {
+        if (rutaLayer) {
+          map.removeLayer(rutaLayer);
+        }
+
+        try {
+          const body = {
+            coordinates: destinos,
+            instructions: false
+          };
+
+          const response = await fetch("https://api.openrouteservice.org/v2/directions/foot-walking/geojson", {
+            method: "POST",
+            headers: {
+              "Authorization": apiKey,
+              "Content-Type": "application/json"
+            },
+            body: JSON.stringify(body)
+          });
+
+          const data = await response.json();
+          rutaLayer = L.geoJSON(data, {
+            style: { color: 'green', weight: 5 }
+          }).addTo(map);
+
+        } catch (err) {
+          console.error("Error al calcular ruta real:", err);
+          alert("No se pudo trazar la ruta real.");
+        }
       }
-      ruta = L.polyline(destinos, { color: 'blue' }).addTo(map);
     });
 
-    // UBICACIÓN EXACTA EN TIEMPO REAL
-    var marcadorUbicacion = null;
-
-    if (navigator.geolocation) {
-      navigator.geolocation.watchPosition(function(position) {
-        var lat = position.coords.latitude;
-        var lng = position.coords.longitude;
-
-        var latlng = [lat, lng];
-
-        if (!marcadorUbicacion) {
-          marcadorUbicacion = L.marker(latlng).addTo(map)
-            .bindPopup("Estás aquí")
-            .openPopup();
-        } else {
-          marcadorUbicacion.setLatLng(latlng);
-        }
-
-        // Centrar mapa solo la primera vez
-        if (!map._ubicacionCentrada) {
-          map.setView(latlng, 15);
-          map._ubicacionCentrada = true;
-        }
-
-      }, function(error) {
-        console.error("Error al obtener ubicación:", error);
-        alert("No se pudo obtener tu ubicación.");
-      }, {
-        enableHighAccuracy: true
-      });
-    } else {
-      alert("Tu navegador no permite geolocalización.");
-    }
+    // Ubicación actual (opcional)
+    navigator.geolocation.getCurrentPosition(pos => {
+      const coords = [pos.coords.latitude, pos.coords.longitude];
+      L.marker(coords).addTo(map).bindPopup("Tu ubicación actual").openPopup();
+      map.setView(coords, 15);
+    });
   </script>
 </body>
 </html>

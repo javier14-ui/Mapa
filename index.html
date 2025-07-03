@@ -1,202 +1,84 @@
 <!DOCTYPE html>
 <html>
 <head>
+  <title>Mapa de Viaje a Cusco</title>
   <meta charset="utf-8" />
-  <title>Mapa Optimizado Cusco</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+  <!-- Estilo de Leaflet -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-  <link rel="stylesheet" href="https://unpkg.com/leaflet-geosearch@3.11.0/dist/geosearch.css" />
-  <script src="https://unpkg.com/leaflet-geosearch@3.11.0/dist/bundle.min.js"></script>
-
   <style>
-    html, body { margin: 0; padding: 0; height: 100%; }
-    #map { height: 100%; width: 100%; }
-
-    .leaflet-control-geosearch {
-      z-index: 1100 !important;
-      position: absolute !important;
-      top: 10px;
-      left: 50%;
-      transform: translateX(-50%);
-    }
-
-    #panel {
-      position: absolute;
-      bottom: 10px;
-      left: 10px;
-      background: white;
-      padding: 10px;
-      z-index: 1000;
-      border-radius: 5px;
-      box-shadow: 0 0 6px rgba(0,0,0,0.3);
-      font-family: sans-serif;
-      width: 250px;
-    }
-
-    #lista {
-      max-height: 150px;
-      overflow-y: auto;
-      font-size: 14px;
-      margin-top: 10px;
-    }
-
-    button {
-      width: 100%;
-      padding: 8px;
-      margin-top: 5px;
-      background: #007bff;
-      color: white;
-      border: none;
-      border-radius: 4px;
+    #map {
+      height: 100vh;
     }
   </style>
 </head>
 <body>
+  <div id="map"></div>
 
-<div id="map"></div>
-<div id="panel">
-  <button onclick="centrarMapa()">📍 Centrar ubicación</button>
-  <button onclick="reiniciar()">🔄 Reiniciar</button>
-  <ul id="lista"></ul>
-</div>
+  <!-- Script de Leaflet -->
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script>
+    // Crear el mapa centrado en Cusco inicialmente
+    var map = L.map('map').setView([-13.53195, -71.96746], 13);
 
-<script>
-  const ORS_KEY = "RQGeAMTsLUsv56L5Mvf5";
-  const map = L.map('map').setView([-13.53195, -71.96746], 14);
+    // Capa básica de OpenStreetMap
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      maxZoom: 18
+    }).addTo(map);
 
-  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-    maxZoom: 19
-  }).addTo(map);
+    // Destinos y ruta
+    var destinos = [];
+    var ruta = null;
 
-  const search = new GeoSearch.GeoSearchControl({
-    provider: new GeoSearch.OpenStreetMapProvider(),
-    style: 'bar',
-    searchLabel: 'Buscar...',
-    autoClose: true,
-    keepResult: true,
-    showMarker: true,
-    retainZoomLevel: false
-  });
-  map.addControl(search);
+    // Al hacer clic, agregar marcador y dibujar línea
+    map.on('click', function(e) {
+      var latlng = e.latlng;
+      destinos.push(latlng);
 
-  let ubicacionActual = null;
-  let marcadorUbicacion = null;
+      L.marker(latlng).addTo(map)
+        .bindPopup("Destino " + destinos.length)
+        .openPopup();
 
-  navigator.geolocation.watchPosition(
-    pos => {
-      ubicacionActual = [pos.coords.latitude, pos.coords.longitude];
-      if (!marcadorUbicacion) {
-        marcadorUbicacion = L.marker(ubicacionActual).addTo(map).bindPopup("Estás aquí").openPopup();
-      } else {
-        marcadorUbicacion.setLatLng(ubicacionActual);
+      if (ruta) {
+        map.removeLayer(ruta);
       }
-    },
-    err => alert("No se pudo obtener ubicación"),
-    { enableHighAccuracy: true }
-  );
-
-  function centrarMapa() {
-    if (ubicacionActual) {
-      map.setView(ubicacionActual, 16);
-    }
-  }
-
-  let destinos = [];
-  let marcadores = [];
-  let rutaLayer = null;
-
-  function reiniciar() {
-    destinos = [];
-    marcadores.forEach(m => map.removeLayer(m));
-    marcadores = [];
-    if (rutaLayer) map.removeLayer(rutaLayer);
-    rutaLayer = null;
-    document.getElementById('lista').innerHTML = '';
-  }
-
-  function actualizarLista(nombres) {
-    const lista = document.getElementById('lista');
-    lista.innerHTML = '';
-    nombres.forEach((nombre, i) => {
-      const li = document.createElement('li');
-      li.textContent = `${i + 1}. ${nombre}`;
-      lista.appendChild(li);
+      ruta = L.polyline(destinos, { color: 'blue' }).addTo(map);
     });
-  }
 
-  map.on('click', async e => {
-    const nombre = prompt("Nombre del destino:");
-    if (!nombre) return;
+    // UBICACIÓN EXACTA EN TIEMPO REAL
+    var marcadorUbicacion = null;
 
-    const { lat, lng } = e.latlng;
-    destinos.push({ nombre, location: [lng, lat] });
+    if (navigator.geolocation) {
+      navigator.geolocation.watchPosition(function(position) {
+        var lat = position.coords.latitude;
+        var lng = position.coords.longitude;
 
-    const marker = L.marker([lat, lng]).addTo(map).bindPopup(nombre);
-    marcadores.push(marker);
+        var latlng = [lat, lng];
 
-    if (destinos.length >= 2) {
-      const jobs = destinos.map((dest, i) => ({
-        id: i + 1,
-        location: dest.location
-      }));
-
-      const vehicle = {
-        id: 1,
-        profile: "foot-walking",
-        start: destinos[0].location
-      };
-
-      const optRes = await fetch("https://api.openrouteservice.org/optimization", {
-        method: "POST",
-        headers: {
-          "Authorization": ORS_KEY,
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify({
-          jobs: jobs,
-          vehicles: [vehicle]
-        })
-      });
-
-      const optData = await optRes.json();
-
-      if (!optData.routes || !optData.routes[0]) return;
-
-      // Construir orden optimizado desde respuesta
-      const pasos = optData.routes[0].steps;
-      const ordenCoordenadas = [vehicle.start];
-      const ordenNombres = [destinos[0].nombre];
-
-      pasos.forEach(step => {
-        if (step.type === "job") {
-          const destino = destinos.find(d => d.location[0] === jobs[step.job - 1].location[0] &&
-                                              d.location[1] === jobs[step.job - 1].location[1]);
-          ordenCoordenadas.push(destino.location);
-          ordenNombres.push(destino.nombre);
+        if (!marcadorUbicacion) {
+          marcadorUbicacion = L.marker(latlng).addTo(map)
+            .bindPopup("Estás aquí")
+            .openPopup();
+        } else {
+          marcadorUbicacion.setLatLng(latlng);
         }
+
+        // Centrar mapa solo la primera vez
+        if (!map._ubicacionCentrada) {
+          map.setView(latlng, 15);
+          map._ubicacionCentrada = true;
+        }
+
+      }, function(error) {
+        console.error("Error al obtener ubicación:", error);
+        alert("No se pudo obtener tu ubicación.");
+      }, {
+        enableHighAccuracy: true
       });
-
-      actualizarLista(ordenNombres);
-
-      const rutaRes = await fetch("https://api.openrouteservice.org/v2/directions/foot-walking/geojson", {
-        method: "POST",
-        headers: {
-          "Authorization": ORS_KEY,
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify({ coordinates: ordenCoordenadas })
-      });
-
-      const rutaJson = await rutaRes.json();
-
-      if (rutaLayer) map.removeLayer(rutaLayer);
-      rutaLayer = L.geoJSON(rutaJson, { style: { color: 'green', weight: 5 } }).addTo(map);
     } else {
-      actualizarLista(destinos.map(d => d.nombre));
+      alert("Tu navegador no permite geolocalización.");
     }
-  });
-</script>
-
+  </script>
 </body>
 </html>

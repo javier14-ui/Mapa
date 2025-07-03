@@ -4,18 +4,14 @@
   <meta charset="utf-8" />
   <title>Mapa Optimizado Cusco</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-
-  <!-- Leaflet -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-
-  <!-- GeoSearch -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet-geosearch@3.11.0/dist/geosearch.css" />
   <script src="https://unpkg.com/leaflet-geosearch@3.11.0/dist/bundle.min.js"></script>
 
   <style>
     html, body { margin: 0; padding: 0; height: 100%; }
-    #map { height: 100%; width: 100%; position: relative; }
+    #map { height: 100%; width: 100%; }
 
     .leaflet-control-geosearch {
       z-index: 1100 !important;
@@ -113,7 +109,9 @@
   function reiniciar() {
     destinos = [];
     marcadores.forEach(m => map.removeLayer(m));
+    marcadores = [];
     if (rutaLayer) map.removeLayer(rutaLayer);
+    rutaLayer = null;
     document.getElementById('lista').innerHTML = '';
   }
 
@@ -137,13 +135,16 @@
     const marker = L.marker([lat, lng]).addTo(map).bindPopup(nombre);
     marcadores.push(marker);
 
-    actualizarLista(destinos.map(d => d.nombre));
-
     if (destinos.length >= 2) {
-      const jobs = destinos.map((dest, i) => ({ id: i + 1, location: dest.location }));
-      const body = {
-        jobs,
-        vehicles: [{ id: 1, profile: "foot-walking", start: destinos[0].location }]
+      const jobs = destinos.map((dest, i) => ({
+        id: i + 1,
+        location: dest.location
+      }));
+
+      const vehicle = {
+        id: 1,
+        profile: "foot-walking",
+        start: destinos[0].location
       };
 
       const optRes = await fetch("https://api.openrouteservice.org/optimization", {
@@ -152,16 +153,31 @@
           "Authorization": ORS_KEY,
           "Content-Type": "application/json"
         },
-        body: JSON.stringify(body)
+        body: JSON.stringify({
+          jobs: jobs,
+          vehicles: [vehicle]
+        })
       });
 
       const optData = await optRes.json();
+
       if (!optData.routes || !optData.routes[0]) return;
 
-      const orden = [destinos[0].location];
-      optData.routes[0].steps.forEach(step => {
-        if (step.type === "job") orden.push(destinos[step.job - 1].location);
+      // Construir orden optimizado desde respuesta
+      const pasos = optData.routes[0].steps;
+      const ordenCoordenadas = [vehicle.start];
+      const ordenNombres = [destinos[0].nombre];
+
+      pasos.forEach(step => {
+        if (step.type === "job") {
+          const destino = destinos.find(d => d.location[0] === jobs[step.job - 1].location[0] &&
+                                              d.location[1] === jobs[step.job - 1].location[1]);
+          ordenCoordenadas.push(destino.location);
+          ordenNombres.push(destino.nombre);
+        }
       });
+
+      actualizarLista(ordenNombres);
 
       const rutaRes = await fetch("https://api.openrouteservice.org/v2/directions/foot-walking/geojson", {
         method: "POST",
@@ -169,13 +185,15 @@
           "Authorization": ORS_KEY,
           "Content-Type": "application/json"
         },
-        body: JSON.stringify({ coordinates: orden })
+        body: JSON.stringify({ coordinates: ordenCoordenadas })
       });
 
       const rutaJson = await rutaRes.json();
 
       if (rutaLayer) map.removeLayer(rutaLayer);
       rutaLayer = L.geoJSON(rutaJson, { style: { color: 'green', weight: 5 } }).addTo(map);
+    } else {
+      actualizarLista(destinos.map(d => d.nombre));
     }
   });
 </script>

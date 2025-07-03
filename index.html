@@ -15,12 +15,20 @@
 
   <style>
     html, body { margin: 0; padding: 0; height: 100%; }
-    #map { height: 100%; width: 100%; }
+    #map { height: 100%; width: 100%; position: relative; }
+
+    .leaflet-control-geosearch {
+      z-index: 1100 !important;
+      position: absolute !important;
+      top: 10px;
+      left: 50%;
+      transform: translateX(-50%);
+    }
 
     #panel {
       position: absolute;
-      top: 10px;
-      right: 10px;
+      bottom: 10px;
+      left: 10px;
       background: white;
       padding: 10px;
       z-index: 1000;
@@ -51,7 +59,6 @@
 <body>
 
 <div id="map"></div>
-
 <div id="panel">
   <button onclick="centrarMapa()">📍 Centrar ubicación</button>
   <button onclick="reiniciar()">🔄 Reiniciar</button>
@@ -59,9 +66,9 @@
 </div>
 
 <script>
-  const ORS_KEY = "RQGeAMTsLUsv56L5Mvf5"; // Tu API key
-
+  const ORS_KEY = "RQGeAMTsLUsv56L5Mvf5";
   const map = L.map('map').setView([-13.53195, -71.96746], 14);
+
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
     maxZoom: 19
   }).addTo(map);
@@ -70,7 +77,10 @@
     provider: new GeoSearch.OpenStreetMapProvider(),
     style: 'bar',
     searchLabel: 'Buscar...',
-    autoClose: true
+    autoClose: true,
+    keepResult: true,
+    showMarker: true,
+    retainZoomLevel: false
   });
   map.addControl(search);
 
@@ -136,7 +146,7 @@
         vehicles: [{ id: 1, profile: "foot-walking", start: destinos[0].location }]
       };
 
-      const opt = await fetch("https://api.openrouteservice.org/optimization", {
+      const optRes = await fetch("https://api.openrouteservice.org/optimization", {
         method: "POST",
         headers: {
           "Authorization": ORS_KEY,
@@ -144,14 +154,16 @@
         },
         body: JSON.stringify(body)
       });
-      const optData = await opt.json();
+
+      const optData = await optRes.json();
+      if (!optData.routes || !optData.routes[0]) return;
 
       const orden = [destinos[0].location];
-      optData.routes[0].steps.forEach(s => {
-        if (s.type === "job") orden.push(destinos[s.job - 1].location);
+      optData.routes[0].steps.forEach(step => {
+        if (step.type === "job") orden.push(destinos[step.job - 1].location);
       });
 
-      const ruta = await fetch("https://api.openrouteservice.org/v2/directions/foot-walking/geojson", {
+      const rutaRes = await fetch("https://api.openrouteservice.org/v2/directions/foot-walking/geojson", {
         method: "POST",
         headers: {
           "Authorization": ORS_KEY,
@@ -159,7 +171,8 @@
         },
         body: JSON.stringify({ coordinates: orden })
       });
-      const rutaJson = await ruta.json();
+
+      const rutaJson = await rutaRes.json();
 
       if (rutaLayer) map.removeLayer(rutaLayer);
       rutaLayer = L.geoJSON(rutaJson, { style: { color: 'green', weight: 5 } }).addTo(map);

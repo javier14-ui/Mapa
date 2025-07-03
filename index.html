@@ -1,44 +1,28 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Ruta Optimizada con Lista</title>
+  <title>Ruta Optimizada con Ubicación</title>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-
-  <!-- Leaflet -->
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-
-  <!-- Leaflet GeoSearch -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet-geosearch@3.11.0/dist/geosearch.css" />
-  <script src="https://unpkg.com/leaflet-geosearch@3.11.0/dist/bundle.min.js"></script>
-
   <style>
-    body, html {
-      margin: 0;
-      padding: 0;
-      height: 100%;
-      font-family: sans-serif;
-    }
-
-    #map {
-      height: 100vh;
-      width: 100vw;
-      position: relative;
-    }
+    html, body { margin: 0; padding: 0; height: 100%; }
+    #map { height: 100vh; width: 100vw; }
 
     #panel {
       position: absolute;
       top: 10px;
       right: 10px;
-      width: 280px;
-      background: rgba(255, 255, 255, 0.95);
-      border-radius: 10px;
+      background: white;
       padding: 12px;
-      box-shadow: 0 2px 6px rgba(0,0,0,0.3);
       z-index: 999;
+      border-radius: 10px;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.3);
       max-height: 90vh;
+      width: 280px;
       overflow-y: auto;
+      font-family: sans-serif;
     }
 
     #reiniciar-btn {
@@ -48,14 +32,14 @@
       border: none;
       border-radius: 5px;
       cursor: pointer;
-      margin-bottom: 10px;
       width: 100%;
+      margin-bottom: 10px;
     }
 
     #info {
       font-weight: bold;
-      margin-bottom: 10px;
       font-size: 14px;
+      margin-bottom: 10px;
     }
 
     ul#listaDestinos {
@@ -80,8 +64,11 @@
   <ul id="listaDestinos"></ul>
 </div>
 
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://unpkg.com/leaflet-geosearch@3.11.0/dist/bundle.min.js"></script>
+
 <script>
-  const apiKey = "5b3ce3597851110001cf624841023b35821447ab8cb9659caa17eb9d"; // Reemplaza con tu clave
+  const apiKey = "5b3ce3597851110001cf624841023b35821447ab8cb9659caa17eb9d";
 
   const map = L.map('map').setView([-13.53195, -71.96746], 14);
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
@@ -94,7 +81,6 @@
     provider,
     style: 'bar',
     searchLabel: 'Buscar lugares...',
-    autoComplete: true,
     autoClose: true,
     keepResult: true
   });
@@ -103,39 +89,21 @@
   let destinos = [];
   let marcadores = [];
   let rutaActual = null;
-
-  // ✅ UBICACIÓN EN VIVO
-  let ubicacionActual = null;
   let marcadorUbicacion = null;
 
-  function mostrarUbicacionEnVivo() {
-    if (!navigator.geolocation) {
-      alert("Tu navegador no permite ubicación en vivo.");
-      return;
-    }
-
+  // 🌍 Ubicación exacta del usuario
+  if (navigator.geolocation) {
     navigator.geolocation.watchPosition(
-      (position) => {
-        const lat = position.coords.latitude;
-        const lng = position.coords.longitude;
-
-        if (marcadorUbicacion) {
-          marcadorUbicacion.setLatLng([lat, lng]);
+      (pos) => {
+        const latlng = [pos.coords.latitude, pos.coords.longitude];
+        if (!marcadorUbicacion) {
+          marcadorUbicacion = L.marker(latlng).addTo(map).bindPopup("Tu ubicación actual").openPopup();
         } else {
-          // Agregar punto palpitante
-          const pulsante = L.divIcon({
-            className: 'punto-palpitante',
-            iconSize: [20, 20]
-          });
-
-          marcadorUbicacion = L.marker([lat, lng], { icon: pulsante }).addTo(map);
+          marcadorUbicacion.setLatLng(latlng);
         }
-
-        map.setView([lat, lng]); // Centra el mapa
-
       },
       (err) => {
-        console.error("Error de geolocalización:", err);
+        console.error("Error ubicación:", err);
         alert("No se pudo obtener tu ubicación.");
       },
       {
@@ -145,28 +113,6 @@
     );
   }
 
-  mostrarUbicacionEnVivo(); // Llamamos al cargar
-
-  // 📍 PUNTO ROJO PALPITANTE (CSS)
-  const style = document.createElement("style");
-  style.innerHTML = `
-    .punto-palpitante {
-      width: 20px;
-      height: 20px;
-      background: red;
-      border-radius: 50%;
-      box-shadow: 0 0 15px rgba(255,0,0,0.7);
-      animation: latido 1.2s infinite;
-    }
-    @keyframes latido {
-      0% { transform: scale(1); opacity: 1; }
-      50% { transform: scale(1.3); opacity: 0.6; }
-      100% { transform: scale(1); opacity: 1; }
-    }
-  `;
-  document.head.appendChild(style);
-
-  // --- TODO LO DEMÁS SIGUE IGUAL ---
   map.on('click', async function(e) {
     const nombre = prompt("¿Cómo se llama este lugar?");
     if (!nombre) return;
@@ -278,3 +224,6 @@
     actualizarLista([]);
   }
 </script>
+
+</body>
+</html>

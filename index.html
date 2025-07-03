@@ -1,69 +1,522 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-  <meta charset="UTF-8">
-  <title>Te amo mucho, mi Yoyo</title>
-  <style>
-    body {
-      background: linear-gradient(to right, #ffe6f0, #ffe0e6);
-      font-family: 'Segoe UI', sans-serif;
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      height: 100vh;
-      margin: 0;
-      overflow: hidden;
-    }
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Optimizador de Rutas</title>
+    <script src="https://maps.googleapis.com/maps/api/js?key=YOUR_API_KEY&libraries=places,geometry&callback=loadMap" async defer></script>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
 
-    .card {
-      background: white;
-      padding: 40px 60px;
-      border-radius: 20px;
-      box-shadow: 0 10px 30px rgba(255, 0, 128, 0.2);
-      text-align: center;
-      animation: float 4s ease-in-out infinite;
-    }
+        body {
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            overflow: hidden;
+        }
 
-    h1 {
-      color: #ff3399;
-      font-size: 2.5em;
-      margin-bottom: 10px;
-      animation: fadeIn 2s ease forwards;
-    }
+        #search-container {
+            position: absolute;
+            top: 10px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 80%;
+            max-width: 500px;
+            z-index: 10;
+            background: white;
+            border-radius: 5px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+            padding: 5px;
+        }
 
-    p {
-      font-size: 1.3em;
-      color: #444;
-      animation: fadeIn 3s ease forwards;
-    }
+        #search-input {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 3px;
+            font-size: 16px;
+        }
 
-    .heart {
-      color: #ff0066;
-      font-size: 2em;
-      animation: pulse 1s infinite;
-    }
+        #panel {
+            width: 300px;
+            background: white;
+            box-shadow: -2px 0 10px rgba(0, 0, 0, 0.1);
+            height: 100%;
+            overflow-y: auto;
+            padding: 15px;
+            position: relative;
+            z-index: 5;
+            transition: transform 0.3s;
+        }
 
-    @keyframes float {
-      0%, 100% { transform: translateY(0); }
-      50% { transform: translateY(-10px); }
-    }
+        #map {
+            flex: 1;
+            height: 100%;
+        }
 
-    @keyframes pulse {
-      0%, 100% { transform: scale(1); }
-      50% { transform: scale(1.2); }
-    }
+        .container {
+            display: flex;
+            flex-direction: row;
+            height: 100%;
+            position: relative;
+        }
 
-    @keyframes fadeIn {
-      from { opacity: 0; transform: translateY(20px); }
-      to { opacity: 1; transform: translateY(0); }
-    }
-  </style>
+        #destinations-list {
+            margin: 20px 0;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+
+        .destination-item {
+            padding: 10px;
+            border-bottom: 1px solid #eee;
+            display: flex;
+            justify-content: space-between;
+        }
+
+        .controls {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+
+        button {
+            padding: 10px 15px;
+            background: #4285F4;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: 500;
+            flex: 1;
+        }
+
+        button:hover {
+            background: #3367D6;
+        }
+
+        button.clear {
+            background: #DC3545;
+        }
+
+        button.clear:hover {
+            background: #C82333;
+        }
+
+        .stats {
+            margin-top: 20px;
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 4px;
+        }
+
+        .hide-panel {
+            transform: translateX(-100%);
+        }
+
+        .panel-toggle {
+            display: none;
+            position: absolute;
+            right: -40px;
+            top: 10px;
+            width: 40px;
+            height: 40px;
+            background: white;
+            box-shadow: -2px 0 10px rgba(0, 0, 0, 0.1);
+            border: none;
+            border-radius: 0 4px 4px 0;
+            z-index: 10;
+        }
+
+        @media (max-width: 768px) {
+            .container {
+                flex-direction: column-reverse;
+            }
+
+            #panel {
+                width: 100%;
+                height: auto;
+                max-height: 40%;
+                position: absolute;
+                bottom: 0;
+                transform: translateY(calc(100% - 60px));
+            }
+
+            .panel-toggle {
+                display: block;
+            }
+
+            #panel.show-panel {
+                transform: translateY(0);
+            }
+
+            #search-container {
+                left: 10px;
+                transform: none;
+                width: calc(100% - 20px);
+            }
+        }
+    </style>
 </head>
 <body>
-  <div class="card">
-    <h1>Te amo mucho</h1>
-    <p>Mi Yoyo preciosa 💖</p>
-    <div class="heart">❤️</div>
-  </div>
+    <div class="container">
+        <div id="panel">
+            <button class="panel-toggle" id="panel-toggle">≡</button>
+            <h2>Optimizador de Rutas</h2>
+            <div class="controls">
+                <button id="center-btn">Centrar en mi ubicación</button>
+                <button id="clear-btn" class="clear">Reiniciar</button>
+            </div>
+            <h3>Destinos:</h3>
+            <div id="destinations-list"></div>
+            <div class="stats">
+                <h3>Resumen de Ruta:</h3>
+                <p id="total-distance">Distancia total: 0 km</p>
+                <p id="total-duration">Duración estimada: 0 minutos</p>
+            </div>
+        </div>
+        <div id="map"></div>
+        <div id="search-container">
+            <input id="search-input" type="text" placeholder="Buscar lugares...">
+        </div>
+    </div>
+
+    <script>
+        let map;
+        let directionsService;
+        let directionsRenderer;
+        let geocoder;
+        let currentLocation = null;
+        let searchBox;
+        let destinations = [];
+        let markers = [];
+        let polyline;
+
+        function initMap() {
+            map = new google.maps.Map(document.getElementById('map'), {
+                center: { lat: 19.4326, lng: -99.1332 }, // Centro en CDMX inicialmente
+                zoom: 12
+            });
+
+            directionsService = new google.maps.DirectionsService();
+            directionsRenderer = new google.maps.DirectionsRenderer({ 
+                map: map,
+                suppressMarkers: true
+            });
+            geocoder = new google.maps.Geocoder();
+
+            // Configurar la barra de búsqueda
+            const input = document.getElementById('search-input');
+            searchBox = new google.maps.places.SearchBox(input);
+            map.controls[google.maps.ControlPosition.TOP_CENTER].push(input);
+
+            // Obtener ubicación actual
+            if (navigator.geolocation) {
+                navigator.geolocation.getCurrentPosition(
+                    position => {
+                        currentLocation = {
+                            lat: position.coords.latitude,
+                            lng: position.coords.longitude
+                        };
+                        map.setCenter(currentLocation);
+                        addUserMarker(currentLocation);
+                    },
+                    () => {
+                        handleLocationError(true, map.getCenter());
+                    }
+                );
+            } else {
+                handleLocationError(false, map.getCenter());
+            }
+
+            // Evento para agregar destinos al hacer clic
+            map.addListener('click', event => {
+                openAddDestinationDialog(event.latLng);
+            });
+
+            // Eventos de búsqueda
+            searchBox.addListener('places_changed', () => {
+                const places = searchBox.getPlaces();
+                if (places.length == 0) return;
+
+                const bounds = new google.maps.LatLngBounds();
+                places.forEach(place => {
+                    if (!place.geometry) return;
+                    bounds.extend(place.geometry.location);
+                });
+                map.fitBounds(bounds);
+            });
+
+            // Eventos de botones
+            document.getElementById('center-btn').addEventListener('click', centerToUserLocation);
+            document.getElementById('clear-btn').addEventListener('click', clearDestinations);
+            document.getElementById('panel-toggle').addEventListener('click', togglePanel);
+
+            // Inicializar polyline para la ruta
+            polyline = new google.maps.Polyline({
+                strokeColor: '#4285F4',
+                strokeOpacity: 1.0,
+                strokeWeight: 3,
+                map: map
+            });
+
+            // Evento para cerrar panel en móviles al tocar el mapa
+            map.addListener('click', () => {
+                if (window.innerWidth <= 768) {
+                    document.getElementById('panel').classList.remove('show-panel');
+                }
+            });
+
+            updateUI();
+        }
+
+        function addUserMarker(position) {
+            new google.maps.Marker({
+                position: position,
+                map: map,
+                icon: {
+                    path: google.maps.SymbolPath.CIRCLE,
+                    scale: 8,
+                    fillColor: '#4285F4',
+                    fillOpacity: 1,
+                    strokeColor: '#FFFFFF',
+                    strokeWeight: 2
+                },
+                title: 'Tu ubicación'
+            });
+        }
+
+        function openAddDestinationDialog(latLng) {
+            const name = prompt('Ingresa un nombre para este destino:', 'Destino ' + (destinations.length + 1));
+            if (name) {
+                addDestination(latLng, name);
+            }
+        }
+
+        function addDestination(latLng, name) {
+            const destination = {
+                position: latLng,
+                name: name,
+                address: 'Obteniendo dirección...' // Se rellenará con geocoding
+            };
+
+            const marker = new google.maps.Marker({
+                position: latLng,
+                map: map,
+                title: name,
+                label: (destinations.length + 1).toString()
+            });
+
+            // Geocodificación para obtener la dirección
+            geocoder.geocode({ location: latLng }, (results, status) => {
+                if (status === 'OK' && results[0]) {
+                    destination.address = results[0].formatted_address;
+                    updateDestinationList();
+                }
+            });
+
+            destinations.push(destination);
+            markers.push(marker);
+
+            if (destinations.length >= 3) {
+                calculateOptimizedRoute();
+            }
+
+            updateUI();
+        }
+
+        function calculateOptimizedRoute() {
+            // Implementación simple del problema del viajante (TSP)
+            // En una aplicación real, se usaría un algoritmo más sofisticado
+            
+            if (destinations.length < 3) return;
+
+            // 1. Calcular todas las distancias entre puntos
+            if (!google.maps.geometry) {
+                alert('La librería de geometría no se cargó correctamente. Revisa tu API Key.');
+                return;
+            }
+            const distanceMatrix = [];
+            for (let i = 0; i < destinations.length; i++) {
+                distanceMatrix[i] = [];
+                for (let j = 0; j < destinations.length; j++) {
+                    if (i === j) {
+                        distanceMatrix[i][j] = 0;
+                    } else {
+                        const distance = google.maps.geometry.spherical.computeDistanceBetween(
+                            destinations[i].position,
+                            destinations[j].position
+                        );
+                        distanceMatrix[i][j] = distance;
+                    }
+                }
+            }
+
+            // 2. Encontrar el orden "greedy" para visitar los puntos
+            const optimizedOrder = [0]; // Comenzar en el primer punto
+            const visited = new Set([0]);
+
+            while (visited.size < destinations.length) {
+                let lastCity = optimizedOrder[optimizedOrder.length - 1];
+                let minDistance = Infinity;
+                let nextCity = -1;
+
+                for (let i = 0; i < destinations.length; i++) {
+                    if (!visited.has(i) && distanceMatrix[lastCity][i] < minDistance) {
+                        minDistance = distanceMatrix[lastCity][i];
+                        nextCity = i;
+                    }
+                }
+
+                if (nextCity !== -1) {
+                    optimizedOrder.push(nextCity);
+                    visited.add(nextCity);
+                }
+            }
+
+            // 3. Reordenar destinos según el orden optimizado
+            const optimizedDestinations = optimizedOrder.map(index => destinations[index]);
+
+            // 4. Calcular y mostrar la ruta
+            displayRoute(optimizedDestinations);
+        }
+
+        function displayRoute(destinations) {
+            if (destinations.length < 2) return;
+
+            const waypoints = destinations.slice(1, -1).map(dest => ({
+                location: dest.position,
+                stopover: true
+            }));
+
+            const request = {
+                origin: destinations[0].position,
+                destination: destinations[destinations.length - 1].position,
+                waypoints: waypoints,
+                travelMode: 'DRIVING',
+                optimizeWaypoints: true
+            };
+
+            directionsService.route(request, (result, status) => {
+                if (status === 'OK') {
+                    directionsRenderer.setDirections(result);
+                    
+                    // Actualizar estadísticas
+                    const route = result.routes[0];
+                    let totalDistance = 0;
+                    let totalDuration = 0;
+                    
+                    route.legs.forEach(leg => {
+                        totalDistance += leg.distance.value;
+                        totalDuration += leg.duration.value;
+                    });
+
+                    document.getElementById('total-distance').textContent = 
+                        `Distancia total: ${(totalDistance / 1000).toFixed(1)} km`;
+                    document.getElementById('total-duration').textContent = 
+                        `Duración estimada: ${Math.round(totalDuration / 60)} minutos`;
+                    
+                    // Actualizar números de markers
+                    markers.forEach(marker => marker.setMap(null));
+                    markers = [];
+                    
+                    destinations.forEach((dest, index) => {
+                        const marker = new google.maps.Marker({
+                            position: dest.position,
+                            map: map,
+                            title: dest.name,
+                            label: (index + 1).toString()
+                        });
+                        markers.push(marker);
+                    });
+                }
+            });
+        }
+
+        function updateDestinationList() {
+            const listElement = document.getElementById('destinations-list');
+            listElement.innerHTML = '';
+            
+            destinations.forEach((dest, index) => {
+                const item = document.createElement('div');
+                item.className = 'destination-item';
+                
+                const info = document.createElement('div');
+                info.innerHTML = `<strong>${index + 1}. ${dest.name}</strong><br><small>${dest.address}</small>`;
+                
+                item.appendChild(info);
+                listElement.appendChild(item);
+            });
+        }
+
+        function centerToUserLocation() {
+            if (currentLocation) {
+                map.setCenter(currentLocation);
+                map.setZoom(15);
+            } else {
+                alert('No se pudo obtener tu ubicación actual.');
+            }
+        }
+
+        function clearDestinations() {
+            destinations.forEach((_, index) => {
+                markers[index].setMap(null);
+            });
+            
+            destinations = [];
+            markers = [];
+            
+            directionsRenderer.setMap(null);
+            directionsRenderer = new google.maps.DirectionsRenderer({ 
+                map: map,
+                suppressMarkers: true
+            });
+            
+            polyline.setMap(null);
+            polyline = new google.maps.Polyline({
+                strokeColor: '#4285F4',
+                strokeOpacity: 1.0,
+                strokeWeight: 3,
+                map: map
+            });
+            
+            document.getElementById('total-distance').textContent = 'Distancia total: 0 km';
+            document.getElementById('total-duration').textContent = 'Duración estimada: 0 minutos';
+            
+            updateUI();
+            updateDestinationList();
+        }
+
+        function updateUI() {
+            document.getElementById('clear-btn').disabled = destinations.length === 0;
+        }
+
+        function togglePanel() {
+            const panel = document.getElementById('panel');
+            panel.classList.toggle('show-panel');
+        }
+
+        function handleLocationError(browserHasGeolocation, pos) {
+            alert(browserHasGeolocation ?
+                'Error: El servicio de geolocalización falló.' :
+                'Error: Tu navegador no soporta geolocalización.');
+            currentLocation = pos;
+        }
+
+        function loadMap() {
+            initMap();
+        }
+
+        // Use API callback instead of window.onload
+        function loadMap() {
+            initMap();
+        }
+    </script>
 </body>
 </html>
+
